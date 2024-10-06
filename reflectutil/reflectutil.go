@@ -3,6 +3,7 @@ package reflectutil
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 func CopyMatchingFields(src, dst interface{}) error {
@@ -43,24 +44,69 @@ func CopyMatchingFields(src, dst interface{}) error {
 
 func MapToStructByFieldName(m map[string]interface{}, s interface{}) error {
 	sVal := reflect.ValueOf(s).Elem()
+	sType := sVal.Type()
 
 	if sVal.Kind() != reflect.Struct {
 		return fmt.Errorf("destination must be a pointer to a struct")
 	}
 
-	for key, value := range m {
-		field := sVal.FieldByName(key)
-		if !field.IsValid() || !field.CanSet() {
+	for i := 0; i < sVal.NumField(); i++ {
+		field := sVal.Field(i)
+		fieldType := sType.Field(i)
+
+		if !field.CanSet() {
 			continue
 		}
 
-		val := reflect.ValueOf(value)
-		if field.Type() == val.Type() {
-			field.Set(val)
+		tag := getTag(fieldType)
+		if tag == "" {
+			tag = fieldType.Name
+		}
+
+		value, exists := m[tag]
+		if !exists {
+			continue
+		}
+
+		if err := setField(field, value); err != nil {
+			return fmt.Errorf("error setting field %s: %v", fieldType.Name, err)
 		}
 	}
 
 	return nil
+}
+
+func getTag(field reflect.StructField) string {
+	tags := []string{"mapstructure", "json", "yaml", "xml"}
+	for _, tagName := range tags {
+		if tag := field.Tag.Get(tagName); tag != "" {
+			return strings.Split(tag, ",")[0] // 处理可能的选项，如 `json:"name,omitempty"`
+		}
+	}
+	return ""
+}
+
+func setField(field reflect.Value, value interface{}) error {
+	val := reflect.ValueOf(value)
+
+	if field.Type() == val.Type() {
+		field.Set(val)
+		return nil
+	}
+
+	if val.Type().ConvertibleTo(field.Type()) {
+		field.Set(val.Convert(field.Type()))
+		return nil
+	}
+
+	if field.Kind() == reflect.Ptr {
+		if field.IsNil() {
+			field.Set(reflect.New(field.Type().Elem()))
+		}
+		return setField(field.Elem(), value)
+	}
+
+	return fmt.Errorf("cannot set field of type %v with value of type %v", field.Type(), val.Type())
 }
 
 func StructToMapByFieldName(s interface{}) (map[string]interface{}, error) {
