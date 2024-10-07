@@ -7,6 +7,11 @@ import (
 )
 
 func CopyMatchingFields(src, dst interface{}) error {
+
+	if m, ok := src.(map[string]interface{}); ok {
+		return MapToStructByFieldName(m, dst)
+	}
+
 	srcVal := reflect.ValueOf(src)
 	dstVal := reflect.ValueOf(dst)
 

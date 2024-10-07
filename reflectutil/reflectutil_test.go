@@ -30,17 +30,15 @@ func TestCopyMatchingFields(t *testing.T) {
 }
 
 func TestMapToStructByFieldName(t *testing.T) {
-	type TestStruct struct {
+	var s struct {
 		Name string
 		Age  int
 	}
 
-	m := map[string]interface{}{
+	m := map[string]any{
 		"Name": "Jane Doe",
 		"Age":  25,
 	}
-
-	s := TestStruct{}
 
 	err := MapToStructByFieldName(m, &s)
 	if err != nil {
@@ -72,5 +70,27 @@ func TestStructToMapByFieldName(t *testing.T) {
 
 	if !reflect.DeepEqual(m, expected) {
 		t.Errorf("Maps are not equal. Expected %+v, got %+v", expected, m)
+	}
+}
+
+func TestCopyMatchingFieldsMap2Struct(t *testing.T) {
+
+	var s struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+
+	m := map[string]interface{}{
+		"name": "Jane Doe",
+		"age":  25,
+	}
+
+	err := CopyMatchingFields(m, &s)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if s.Name != "Jane Doe" || s.Age != 25 {
+		t.Errorf("Struct fields not set correctly. Expected {Jane Doe 25}, got %+v", s)
 	}
 }
